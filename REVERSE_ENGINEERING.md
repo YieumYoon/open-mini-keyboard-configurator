@@ -6,11 +6,14 @@ A higher-level vendor UI coverage map lives in `VENDOR_COVERAGE.md`.
 
 ## Vendor Binary
 
-- App: `MINI_KEYBOARD.app`
+- App: `/Applications/MINI_KEYBOARD.app`
 - Executable: `Contents/MacOS/MINI_KEYBOARD`
 - Architecture: x86_64 Mach-O
-- UI framework: Qt 5
+- Bundle identifier: `COM.LQKJ.KEYBOARD.MINI-KEYBOARD`
+- UI framework: Qt 5.12.9 (`QtWidgets`, `QtGui`, `QtCore`)
 - HID library: bundled `libhidapi.0.12.0.dylib`
+- Code signature: hardened runtime, TeamIdentifier `4Z759TG5T3`,
+  CDHash `aab01ac59d748ccbed5661354a2edcf2ce0b3f66`
 
 Important symbols remain in the binary, including:
 
@@ -28,6 +31,50 @@ Important symbols remain in the binary, including:
 this binary. The replacement therefore treats `Widget::HID_write()` as the
 authoritative write path and builds the HID reports directly instead of trying
 to mirror one visible button handler.
+
+## Extractable App Surface
+
+The bundle exposes enough static surface to map most of the HID programming
+model without running the vendor app:
+
+- Qt classes and slots: `Dialog1`, `Dialog2`, `Widget`, `TabWidget`,
+  `TabBars`, `CustomTabStyle`, and `HID_Key_Val`.
+- HID imports: `hid_enumerate`, `hid_open_path`, `hid_write`, `hid_read`,
+  `hid_read_timeout`, `hid_set_nonblocking`, `hid_error`, and cleanup helpers.
+- Qt translation resources: `:/lanague_cn.qm` and `:/lanague_en.qm` (the
+  vendor spelling is `lanague`).
+- Brand/title strings: `MINI_KEYBOARD`, `ANTICATER`, and `ANTICATER_MINI`.
+- Resource/layout names for multiple product families: `KB_12key_2VT`,
+  `BT_12key_2VT`, `KB_5key_Mute`, `BT_5key_Mute`, `KB_3key_1VT_Mute`,
+  `BT_3key_1VT_Mute`, `KB_6key_0VT`, `BT_6key_0VT`, `KB_6key_2VT`,
+  `BT_6key_2VT`, `KB_9key_3VT`, `BT_9key_3VT`, and
+  `KB_6ADD2_QR_CODE`.
+- Embedded images include `:/image/KB_12ADD2`, `:/image/KB_5KEY_MUTE`,
+  `:/image/KB_3ADD1`, `:/image/KB_6ADD2`, `:/image/KB_6KEY`,
+  `:/image/KB_9ADD3.png`, keycap images `KEY1` through `KEY21`, knob images,
+  and the LAN/KD QR asset `:/image/LAN_KD/KH_QR_CODE_EN.png`.
+
+The image resources carry Photoshop XMP metadata from a Windows toolchain
+(`Adobe Photoshop 21.2 (Windows)`). Observed asset creation/modification dates
+range from `2022-02-25` through `2024-09-06`, which is consistent with a
+shared vendor app accumulating support for several related/rebranded products.
+
+## Static State Layout
+
+The binary keeps named global state, which makes the report layout easier to
+cross-check:
+
+- `_VID`, `_PID`, and `_PID_GRU`: USB identity globals.
+- `_KeyBoard_KeyNum` and `_Cur_KeyBoard_KeyNum`: active model bytes from the
+  read-only model probe.
+- `_PHY_KEY_Value` and `_PHY2_KEY_Value`: old/new key configuration buffers.
+- `_KeyVale_ModifyFlag`: modified-record flags scanned by `HID_write()`.
+- `_KeyBoard_KeyLed`: LED RGB data. The symbol span is `0x90` bytes, matching
+  3 layers x 16 LED entries x 3 RGB bytes.
+- `_RGB_LED_Md`: 3 bytes of per-layer LED mode state.
+- `_RgbLED_Change_Flag`: dirty flag for LED writes.
+- `_KD_Ver_Infor`: KD/LAN variant selector used by the model dispatcher.
+- `_delay_spinBoxes` and `_delay_values`: delay UI backing storage.
 
 ## Tested Device
 
@@ -71,6 +118,65 @@ layout handlers are exposed by `vendor-models --handlers`; that list includes
 the connected board's `Widget::Set_Keyboard_12add2()` handler plus internal
 handlers such as `12+4KEY`, `16+3KEY`, and `21+1KEY` that do not have matching
 public model strings in this binary.
+
+The static UI object names show an even wider physical layout surface than the
+visible public model list:
+
+- main key buttons `pushButton_K1` through `pushButton_K15`
+- additional key buttons and background variants through `pushButton_K27`
+- knob/editor buttons `k1_left`, `k1_middle`, `k1_right` through
+  `k4_left`, `k4_middle`, `k4_right`
+- layer controls `Layer1`, `Layer2`, `Layer3`, `LAYER_SELE`, and `ALL_KEY_BK`
+
+That does not mean every listed button is populated on the connected board; it
+means this one binary carries UI/layout support for variants up to at least 27
+physical UI slots.
+
+## Vendor Model Byte Routing
+
+`Widget::Read_KeyBoard_KeyNum()` sends the read-only probe `03 fb fb fb ...`,
+reads a 64-byte response, and stores response bytes 2, 3, and 4 as the active
+model bytes. `Widget::Identify_KeyBoard_style()` then dispatches on those bytes
+plus a few app flags. The replacement exposes this as `vendor-models --routes`
+and includes the decoded route in `info` and `fingerprint --probe-info`.
+
+| Model bytes | Extra condition | Vendor route |
+| --- | --- | --- |
+| `0,1,<10` | | `0+1KEY` / `Widget::Set_Keyboard_0add1()` |
+| `0,1,>=10` | | `0+1_2KEY` / `Widget::Set_Keyboard_0add1_2()` |
+| `0,2,*` | PID `0x8850` | `0+2KEY` / `Widget::Set_Keyboard_0add2()` |
+| `0,2,*` | PID not `0x8850` | `0+1KEY` / `Widget::Set_Keyboard_0add1()` |
+| `0,3,*` | | `0+3KEY` / `Widget::Set_Keyboard_0add3()` |
+| `1,0,*` | | `1KEY` / `Widget::Set_Keyboard_1add0()` |
+| `2,0,*` | | `2KEY` / `Widget::Set_Keyboard_2add0()` |
+| `3,0,*` | | `3KEY` / `Widget::Set_Keyboard_3add0()` |
+| `3,1,*` | | `3+1KEY` / `Widget::Set_Keyboard_3add1()` |
+| `4,0,*` | | `4KEY` / `Widget::Set_Keyboard_4Key()` |
+| `4,1,0` | PID not `0x8851` | `4+1KEY` / `Widget::Set_Keyboard_4add1()` |
+| `4,1,*` | PID `0x8851` | `4+1_2KEY` / `Widget::Set_Keyboard_4add2()` |
+| `4,1,1` | | `4+1_2KEY` / `Widget::Set_Keyboard_4add2()` |
+| `4,3,*` | | `4+3KEY` / `Widget::Set_Keyboard_4add3()` |
+| `5,0,*` | | `5KEY` / `Widget::Set_Keyboard_5Key_Mute()` |
+| `6,0,*` | | `6KEY` / `Widget::Set_Keyboard_6Key()` |
+| `6,1,*` | | `6+1KEY` / `Widget::Set_Keyboard_6add1()` |
+| `6,2,*` | KD/LAN flag set | `6+2KEY-LAN-KD` / `Widget::Set_Keyboard_6add2_Lan_KD()` |
+| `6,2,*` | | `6+2KEY` / `Widget::Set_Keyboard_6add2()` |
+| `9,0,*` | | `9KEY` / `Widget::Set_Keyboard_9add0()` |
+| `9,2,*` | | `9+2KEY` / `Widget::Set_Keyboard_9add2()` |
+| `9,3,*` | | `9+3KEY` / `Widget::Set_Keyboard_9add3()` |
+| `11,3,*` | | `11+3KEY` / `Widget::Set_Keyboard_11add3()` |
+| `12,0,*` | | `12KEY` / `Widget::Set_Keyboard_12add0()` |
+| `12,2,*` | | `12+2KEY` / `Widget::Set_Keyboard_12add2()` |
+| `12,3,*` | | `12+3KEY` / `Widget::Set_Keyboard_12add3()` |
+| `12,4,*` | KD/LAN flag set | `12+4KEY-LAN` / `Widget::Set_Keyboard_12add4_Lan()` |
+| `12,4,*` | | `12+4KEY` / `Widget::Set_Keyboard_12add4()` |
+| `16,0,*` | | `16KEY` / `Widget::Set_Keyboard_16add0()` |
+| `16,3,*` | | `16+3KEY` / `Widget::Set_Keyboard_16add3()` |
+| `21,1,*` | | `21+1KEY` / `Widget::Set_Keyboard_21add1()` |
+
+Unmatched combinations fall through to `Widget::Set_Keyboard_15add3()` inside
+the vendor app. The replacement does not treat that fallback as a positive
+identity match; unknown hardware should still be fingerprinted and tested.
 
 ## HID Report Shapes
 
@@ -220,9 +326,10 @@ The vendor UI contains `LED_color_N` button object names. Static string parsing
 confirmed RGB styles for 53 swatches, now exposed as aliases such as
 `swatch-1`, `vendor-1`, and `LED_color_1`.
 
-Some object numbers appear without an adjacent `background-color: rgb(...)`
-style in the extracted strings, so only confirmed RGB swatches are included in
-the replacement palette.
+`LED_color_34`, `LED_color_43`, and `LED_color_55` appear as object names but
+do not have an adjacent `background-color: rgb(...)` style in the extracted
+strings. The replacement intentionally omits those three instead of guessing
+RGB values.
 
 ## Procreate Tab
 

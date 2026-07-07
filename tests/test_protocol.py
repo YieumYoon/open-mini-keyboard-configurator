@@ -5,12 +5,15 @@ import contextlib
 import io
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 
 from mini_keyboard_tool.catalog import (
     PROCREATE_ACTIONS,
     PROCREATE_PRESET_BY_SLUG,
     VENDOR_MODELS,
+    identify_vendor_model_route,
     vendor_model_handlers,
+    vendor_model_route_dict,
 )
 from mini_keyboard_tool.cli import (
     _build_clear_reports,
@@ -61,6 +64,11 @@ from mini_keyboard_tool.protocol import (
     build_media_report,
     build_mouse_report,
     build_sequence_report,
+)
+from mini_keyboard_tool.profiles import (
+    best_profile_match,
+    device_fingerprint_dict,
+    device_profiles,
 )
 
 
@@ -219,7 +227,9 @@ class CliDryRunSmokeTests(unittest.TestCase):
             (["vendor-key-aliases", "--filter", "prt"], "PrtScSysRq"),
             (["media-codes", "--filter", "volume"], "volume-down"),
             (["mouse-actions", "--filter", "swipe"], "swipe-left"),
+            (["device-profiles", "--filter", "514c"], "514c-8850-12plus2-fd"),
             (["vendor-models", "--handlers", "--filter", "12+2"], "Set_Keyboard_12add2"),
+            (["vendor-models", "--routes", "--filter", "12,2"], "Set_Keyboard_12add2"),
             (["procreate-actions", "--filter", "redo"], "shift+cmd+z"),
             (["led-modes"], "mode2"),
             (["led-colors", "--filter", "swatch-1"], "#ff0000"),
@@ -327,6 +337,41 @@ class VendorCatalogTests(unittest.TestCase):
         self.assertIn("12+2KEY", output)
         self.assertIn("Set_Keyboard_12add2", output)
 
+    def test_vendor_model_routes_decode_app_dispatch_rules(self) -> None:
+        route = identify_vendor_model_route((12, 2, 11), product_id=0x8850)
+        self.assertIsNotNone(route)
+        assert route is not None
+        self.assertEqual(route.model, "12+2KEY")
+        self.assertEqual(route.handler, "Widget::Set_Keyboard_12add2()")
+
+        alternate = identify_vendor_model_route((4, 1, 0), product_id=0x8851)
+        self.assertIsNotNone(alternate)
+        assert alternate is not None
+        self.assertEqual(alternate.model, "4+1_2KEY")
+
+        normal = identify_vendor_model_route((4, 1, 0), product_id=0x8850)
+        self.assertIsNotNone(normal)
+        assert normal is not None
+        self.assertEqual(normal.model, "4+1KEY")
+        self.assertIsNone(identify_vendor_model_route((4, 1, 0)))
+
+        kd = identify_vendor_model_route((6, 2, 0), product_id=0x8850, kd_version=1)
+        self.assertIsNotNone(kd)
+        assert kd is not None
+        self.assertEqual(kd.model, "6+2KEY-LAN-KD")
+
+        self.assertIsNone(identify_vendor_model_route((99, 99, 0), product_id=0x8850))
+
+        route_dict = vendor_model_route_dict(route)
+        self.assertEqual(route_dict["condition"], "bytes=12,2,*")
+
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer):
+            cmd_vendor_models(argparse.Namespace(filter="4+1", json=False, routes=True))
+        output = buffer.getvalue()
+        self.assertIn("4+1_2KEY", output)
+        self.assertIn("pid=0x8851", output)
+
     def test_procreate_catalog_contains_vendor_labels(self) -> None:
         slugs = {slug for slug, _ in PROCREATE_ACTIONS}
         self.assertIn("quick-menu", slugs)
@@ -361,6 +406,77 @@ class VendorCatalogTests(unittest.TestCase):
         output = buffer.getvalue()
         self.assertIn("Expanded tokens: 0xf4 0x06", output)
         self.assertIn("cmd+c", output)
+
+
+class DeviceProfileTests(unittest.TestCase):
+    def _device(self, **overrides: object) -> SimpleNamespace:
+        values = {
+            "path": b"test-path",
+            "path_text": "test-path",
+            "vendor_id": 0x514C,
+            "product_id": 0x8850,
+            "serial_number": None,
+            "release_number": 0x0100,
+            "manufacturer_string": None,
+            "product_string": "MINI_KEYBOARD",
+            "usage_page": 0xFF00,
+            "usage": 0x0001,
+            "interface_number": 0,
+        }
+        values.update(overrides)
+        return SimpleNamespace(**values)
+
+    def test_device_profile_catalog_contains_verified_default(self) -> None:
+        profiles = device_profiles("12plus2")
+        self.assertEqual(len(profiles), 1)
+        self.assertEqual(profiles[0].id, "514c-8850-12plus2-fd")
+        self.assertEqual(profiles[0].write_support, "enabled")
+
+    def test_config_interface_matches_verified_profile_with_high_confidence(self) -> None:
+        match = best_profile_match(self._device())
+        self.assertIsNotNone(match)
+        assert match is not None
+        self.assertEqual(match.profile.id, "514c-8850-12plus2-fd")
+        self.assertEqual(match.confidence, "high")
+        self.assertEqual(match.profile.protocol_family, "fd-new")
+
+        record = device_fingerprint_dict(self._device(), match=match, model_bytes=(12, 2, 3))
+        self.assertTrue(record["looks_like_config_interface"])
+        self.assertEqual(record["effective_write_support"], "enabled")
+        self.assertEqual(record["model_bytes"], [12, 2, 3])
+        self.assertEqual(record["vendor_model_route"]["model"], "12+2KEY")
+        matched = record["match"]
+        self.assertIsInstance(matched, dict)
+        assert isinstance(matched, dict)
+        self.assertEqual(matched["profile"]["write_support"], "enabled")
+
+    def test_same_vid_pid_standard_interface_is_only_low_confidence(self) -> None:
+        match = best_profile_match(
+            self._device(
+                usage_page=0x0001,
+                usage=0x0006,
+                interface_number=1,
+                product_string="USB Composite Device",
+            )
+        )
+        self.assertIsNotNone(match)
+        assert match is not None
+        self.assertEqual(match.profile.id, "514c-8850-12plus2-fd")
+        self.assertEqual(match.confidence, "low")
+        self.assertTrue(match.warnings)
+        record = device_fingerprint_dict(
+            self._device(
+                usage_page=0x0001,
+                usage=0x0006,
+                interface_number=1,
+                product_string="USB Composite Device",
+            ),
+            match=match,
+        )
+        self.assertEqual(
+            record["effective_write_support"],
+            "enabled-on-config-interface-only",
+        )
 
 
 class SnapshotRestoreTests(unittest.TestCase):

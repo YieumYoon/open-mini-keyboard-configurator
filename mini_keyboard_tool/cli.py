@@ -11,7 +11,9 @@ from .catalog import (
     PROCREATE_PRESET_BY_SLUG,
     PROCREATE_PRESETS,
     VENDOR_MODELS,
+    identify_vendor_model_route,
     vendor_model_handlers,
+    vendor_model_routes,
 )
 from .hidapi import HIDAPIError, HidAPI
 from .keycodes import (
@@ -52,6 +54,12 @@ from .protocol import (
     hex_dump,
     parse_info_response,
     parse_led_response,
+)
+from .profiles import (
+    best_profile_match,
+    device_fingerprint_dict,
+    device_profile_dict,
+    device_profiles,
 )
 
 
@@ -382,6 +390,13 @@ def cmd_list(args: argparse.Namespace) -> int:
     vendor_id = 0 if args.all else args.vid
     product_id = 0 if args.all else args.pid
     devices = api.enumerate(vendor_id, product_id)
+    if args.path:
+        path_bytes = args.path.encode("utf-8")
+        devices = [
+            device
+            for device in devices
+            if device.path == path_bytes or device.path_text == args.path
+        ]
     if not devices:
         print("No HID devices found.")
         return 1
@@ -420,6 +435,138 @@ def cmd_info(args: argparse.Namespace) -> int:
         print(f"Could not parse response: {exc}")
         return 1
     print(f"Keyboard model bytes: {model[0]}, {model[1]}, {model[2]}")
+    route = identify_vendor_model_route(model, product_id=args.pid)
+    if route is None:
+        print("Vendor model route: unknown exact route in the current catalog")
+    else:
+        print(f"Vendor model route: {route.model} via {route.handler}")
+        if route.note:
+            print(f"Route note: {route.note}")
+    return 0
+
+
+def _probe_info_for_device(
+    api: HidAPI,
+    args: argparse.Namespace,
+    path: bytes,
+) -> tuple[int, int, int]:
+    request = build_info_request()
+    with api.open_device(args.vid, args.pid, None, path) as device:
+        device.write(request)
+        response = device.read_timeout(64, args.timeout)
+    if not response:
+        raise HIDAPIError("no response before timeout")
+    return parse_info_response(response)
+
+
+def _print_fingerprint_record(record: dict[str, object], index: int) -> None:
+    marker = "*" if record["looks_like_config_interface"] else " "
+    print(
+        f"{marker} [{index}] VID:PID={record['vendor_id']}:{record['product_id']} "
+        f"usage={record['usage_page']}:{record['usage']} "
+        f"interface={record['interface_number']}"
+    )
+    print(
+        f"    product={record['product_string']!r} "
+        f"manufacturer={record['manufacturer_string']!r} "
+        f"serial={record['serial_number']!r}"
+    )
+    print(f"    path={record['path']}")
+    match = record.get("match")
+    if isinstance(match, dict):
+        profile = match["profile"]
+        assert isinstance(profile, dict)
+        protocol = profile["protocol"]
+        usb = profile["usb"]
+        assert isinstance(protocol, dict)
+        assert isinstance(usb, dict)
+        print(
+            f"    matched profile: {profile['id']} "
+            f"({match['confidence']} confidence, score {match['score']})"
+        )
+        print(
+            f"    layout={profile['layout']} protocol={protocol['family']} "
+            f"status={profile['status']} write={profile['write_support']}"
+        )
+        effective_write = record.get("effective_write_support")
+        if effective_write != profile["write_support"]:
+            print(f"    effective write on this interface: {effective_write}")
+        print(
+            f"    expected config usage={usb['usage_page']}:{usb['usage']} "
+            f"interface={usb['interface_number']}"
+        )
+        warnings = match.get("warnings")
+        if isinstance(warnings, list):
+            for warning in warnings:
+                print(f"    warning: {warning}")
+    elif record["looks_like_config_interface"]:
+        print("    no built-in profile matched, but this is a vendor-defined HID interface")
+    else:
+        print("    no built-in profile matched")
+
+    model_bytes = record.get("model_bytes")
+    if isinstance(model_bytes, list):
+        print(f"    model bytes: {', '.join(str(byte) for byte in model_bytes)}")
+    route = record.get("vendor_model_route")
+    if isinstance(route, dict):
+        print(f"    vendor model route: {route['model']} via {route['handler']}")
+        note = route.get("note")
+        if note:
+            print(f"    route note: {note}")
+    probe_error = record.get("probe_error")
+    if isinstance(probe_error, str):
+        print(f"    probe error: {probe_error}")
+
+
+def cmd_fingerprint(args: argparse.Namespace) -> int:
+    api = HidAPI(args.hidapi)
+    vendor_id = 0 if args.all else args.vid
+    product_id = 0 if args.all else args.pid
+    devices = api.enumerate(vendor_id, product_id)
+    if args.path:
+        path_bytes = args.path.encode("utf-8")
+        devices = [
+            device
+            for device in devices
+            if device.path == path_bytes or device.path_text == args.path
+        ]
+    if not devices:
+        print("No HID devices found.")
+        return 1
+
+    records: list[dict[str, object]] = []
+    for device in devices:
+        match = best_profile_match(device)
+        model_bytes = None
+        probe_error = None
+        if args.probe_info and device.usage_page == DEFAULT_USAGE_PAGE:
+            try:
+                model_bytes = _probe_info_for_device(api, args, device.path)
+            except (HIDAPIError, ValueError) as exc:
+                probe_error = str(exc)
+        records.append(
+            device_fingerprint_dict(
+                device,
+                match=match,
+                model_bytes=model_bytes,
+                probe_error=probe_error,
+            )
+        )
+
+    result = {
+        "hidapi": api.path,
+        "devices": records,
+    }
+    if args.json:
+        print(json.dumps(result, indent=2))
+        return 0
+
+    print("MINI_KEYBOARD fingerprint")
+    print(f"Loaded hidapi: {api.path}")
+    for index, record in enumerate(records):
+        if index:
+            print()
+        _print_fingerprint_record(record, index)
     return 0
 
 
@@ -617,8 +764,56 @@ def cmd_mouse_actions(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_device_profiles(args: argparse.Namespace) -> int:
+    profiles = device_profiles(args.filter)
+    rows = [device_profile_dict(profile) for profile in profiles]
+    if args.json:
+        print(json.dumps(rows, indent=2))
+        return 0
+
+    print(
+        f"{'id':32s} {'usb':14s} {'layout':10s} "
+        f"{'protocol':16s} {'status':18s} write"
+    )
+    for profile in profiles:
+        print(
+            f"{profile.id:32s} {profile.vid_pid:14s} {profile.layout:10s} "
+            f"{profile.protocol_family:16s} {profile.status:18s} {profile.write_support}"
+        )
+        print(f"{'':32s} {profile.usb_label}")
+        if profile.notes:
+            print(f"{'':32s} {profile.notes}")
+    return 0
+
+
 def cmd_vendor_models(args: argparse.Namespace) -> int:
     needle = args.filter.lower() if args.filter else None
+    if getattr(args, "routes", False):
+        rows = [
+            row
+            for row in vendor_model_routes()
+            if needle is None
+            or needle in str(row["model"]).lower()
+            or needle in str(row["handler"]).lower()
+            or needle in str(row["condition"]).lower()
+            or needle in str(row["note"]).lower()
+        ]
+        if args.json:
+            print(json.dumps(rows, indent=2))
+            return 0
+        print(f"{'bytes':13s} {'model':16s} {'public':>6s} route")
+        for row in rows:
+            public = "yes" if row["public"] else "no"
+            byte_pattern = f"{row['key_count']},{row['extra_count']},{row['feature']}"
+            print(
+                f"{byte_pattern:13s} "
+                f"{str(row['model']):16s} {public:>6s} {row['handler']}"
+            )
+            print(f"{'':13s} {'':16s} {'':6s} {row['condition']}")
+            if row["note"]:
+                print(f"{'':13s} {'':16s} {'':6s} {row['note']}")
+        return 0
+
     if getattr(args, "handlers", False):
         rows = [
             row
@@ -2408,6 +2603,21 @@ def build_parser() -> argparse.ArgumentParser:
     list_parser.add_argument("--all", action="store_true", help="List every HID device")
     list_parser.set_defaults(func=cmd_list)
 
+    fingerprint_parser = subparsers.add_parser(
+        "fingerprint",
+        help="Identify connected MINI_KEYBOARD-compatible HID devices",
+    )
+    add_hid_args(fingerprint_parser)
+    fingerprint_parser.add_argument("--all", action="store_true", help="Scan every HID device")
+    fingerprint_parser.add_argument(
+        "--probe-info",
+        action="store_true",
+        help="send the read-only vendor model probe to matching config interfaces",
+    )
+    fingerprint_parser.add_argument("--timeout", type=int, default=1000, help="Read timeout ms")
+    fingerprint_parser.add_argument("--json", action="store_true")
+    fingerprint_parser.set_defaults(func=cmd_fingerprint)
+
     info_parser = subparsers.add_parser("info", help="Send the app's model probe")
     add_hid_args(info_parser)
     info_parser.add_argument("--timeout", type=int, default=1000, help="Read timeout ms")
@@ -2654,6 +2864,14 @@ def build_parser() -> argparse.ArgumentParser:
     mouse_actions_parser.add_argument("--filter")
     mouse_actions_parser.set_defaults(func=cmd_mouse_actions)
 
+    device_profiles_parser = subparsers.add_parser(
+        "device-profiles",
+        help="List built-in device fingerprint/profile records",
+    )
+    device_profiles_parser.add_argument("--filter")
+    device_profiles_parser.add_argument("--json", action="store_true")
+    device_profiles_parser.set_defaults(func=cmd_device_profiles)
+
     vendor_models_parser = subparsers.add_parser(
         "vendor-models", help="List keyboard model strings found in the vendor app"
     )
@@ -2662,6 +2880,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--handlers",
         action="store_true",
         help="include static Widget::Set_Keyboard_* handler metadata",
+    )
+    vendor_models_parser.add_argument(
+        "--routes",
+        action="store_true",
+        help="include Identify_KeyBoard_style() model-byte routing metadata",
     )
     vendor_models_parser.add_argument("--json", action="store_true")
     vendor_models_parser.set_defaults(func=cmd_vendor_models)

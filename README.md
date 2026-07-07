@@ -52,10 +52,48 @@ Other model names and layout handlers are documented as static compatibility
 clues from the vendor app; they should be treated as unverified until someone
 with that hardware tests them.
 
-Use `vendor-models` and `vendor-models --handlers` to print the catalog known
-to this tool. Hardware photos and layout notes can be collected under
+Use `vendor-models`, `vendor-models --handlers`, and `vendor-models --routes`
+to print the catalog known to this tool. The route table is the vendor app's
+model-byte dispatcher: it maps the `info` probe bytes to the layout handler
+the app would choose. Hardware photos and layout notes can be collected under
 `docs/hardware/`; use only photos you took yourself or images that are clearly
 licensed for redistribution.
+
+## Device fingerprints and profile status
+
+Generic MINI_KEYBOARD-style devices are often sold under unrelated brand names.
+Treat the sales name as a weak alias; the useful identity is the USB/HID
+fingerprint plus the protocol family and vendor model-byte route.
+
+Print the built-in profile database:
+
+```sh
+uv run python -m mini_keyboard_tool device-profiles
+uv run python -m mini_keyboard_tool device-profiles --filter 514c
+```
+
+Identify connected devices:
+
+```sh
+uv run python -m mini_keyboard_tool fingerprint
+uv run python -m mini_keyboard_tool fingerprint --probe-info
+uv run python -m mini_keyboard_tool fingerprint --all --json
+```
+
+Profile status labels are intentionally conservative:
+
+- `catalog-only`: seen only in vendor app strings or handlers.
+- `external-reference`: seen in another public project or protocol note.
+- `fingerprinted`: USB/HID identity observed, but not enough behavior tested.
+- `read-tested`: read-only commands have been exercised.
+- `write-tested`: at least one write path has been physically tested.
+- `physically-tested`: the documented feature set has a local physical test
+  trail.
+
+Only profiles marked write-enabled by this project should be used for normal
+configuration writes. Unknown or externally referenced boards should start with
+`fingerprint`, `info`, read-only snapshots, and the submission checklist in
+`docs/hardware/SUBMIT_DEVICE.md`.
 
 ## Safety model
 
@@ -216,6 +254,7 @@ List vendor app catalog data extracted from the binary:
 ```sh
 uv run python -m mini_keyboard_tool vendor-models
 uv run python -m mini_keyboard_tool vendor-models --handlers
+uv run python -m mini_keyboard_tool vendor-models --routes
 uv run python -m mini_keyboard_tool vendor-key-aliases
 uv run python -m mini_keyboard_tool procreate-actions
 uv run python -m mini_keyboard_tool procreate-actions --filter brush
@@ -223,9 +262,11 @@ uv run python -m mini_keyboard_tool procreate-actions --filter brush
 
 `vendor-models --handlers` lists the static `Widget::Set_Keyboard_*` layout
 handlers found in the binary, including internal handlers that do not have a
-matching public model string. `procreate-actions` lists labels and static token
-mappings from the vendor app's Procreate tab, for example `copy` as `cmd+c` and
-`redo` as `shift+cmd+z`.
+matching public model string. `vendor-models --routes` lists the app's
+`Identify_KeyBoard_style()` model-byte routing rules, including PID/KD special
+cases such as the alternate `4+1_2KEY` handler. `procreate-actions` lists
+labels and static token mappings from the vendor app's Procreate tab, for
+example `copy` as `cmd+c` and `redo` as `shift+cmd+z`.
 
 Read the keyboard's model bytes using the vendor app's probe command:
 

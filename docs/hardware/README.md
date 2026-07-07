@@ -11,6 +11,19 @@ keyboards. This project currently has physical validation for only the
 | `12+2KEY` | Physically tested | 12 visible keys, two rotary encoders, wired RGB LED control verified. |
 | Other public vendor model strings | Static only | Listed by `vendor-models`; needs hardware-owner testing. |
 | Internal handler-only layouts | Static only | Listed by `vendor-models --handlers`; may represent unreleased, regional, or alternate boards. |
+| Vendor model-byte routes | Static only | Listed by `vendor-models --routes`; maps read-only probe bytes to the handler the vendor app would select. |
+
+The richer USB/HID profile database is available from:
+
+```sh
+uv run python -m mini_keyboard_tool device-profiles
+uv run python -m mini_keyboard_tool fingerprint --all --json
+uv run python -m mini_keyboard_tool fingerprint --probe-info
+```
+
+To report a new board, use [SUBMIT_DEVICE.md](SUBMIT_DEVICE.md). The checklist
+keeps sales names, photos, USB fingerprints, read-only probes, and write tests
+separate so support status can stay conservative.
 
 Public model strings currently known to the tool:
 
