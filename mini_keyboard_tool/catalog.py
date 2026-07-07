@@ -1,0 +1,171 @@
+from __future__ import annotations
+
+
+VENDOR_MODELS: tuple[str, ...] = (
+    "2KEY",
+    "3KEY",
+    "3+1KEY",
+    "4KEY",
+    "4+1KEY",
+    "4+1_2KEY",
+    "5KEY",
+    "6KEY",
+    "6+1KEY",
+    "6+2KEY",
+    "9+2KEY",
+    "9+3KEY",
+    "11+3KEY",
+    "12+2KEY",
+    "12+3KEY",
+    "15+3KEY",
+)
+
+VENDOR_MODEL_HANDLERS: tuple[dict[str, object], ...] = (
+    {
+        "model": "0+1KEY",
+        "handler": "Widget::Set_Keyboard_0add1()",
+        "keys": 0,
+        "extras": 1,
+        "public": False,
+        "note": "internal handler symbol; no matching public model string observed",
+    },
+    {
+        "model": "0+1_2KEY",
+        "handler": "Widget::Set_Keyboard_0add1_2()",
+        "keys": 0,
+        "extras": 1,
+        "public": False,
+        "note": "internal alternate 0+1 handler",
+    },
+    {
+        "model": "0+2KEY",
+        "handler": "Widget::Set_Keyboard_0add2()",
+        "keys": 0,
+        "extras": 2,
+        "public": False,
+        "note": "internal handler symbol; no matching public model string observed",
+    },
+    {
+        "model": "0+3KEY",
+        "handler": "Widget::Set_Keyboard_0add3()",
+        "keys": 0,
+        "extras": 3,
+        "public": False,
+        "note": "internal handler symbol; no matching public model string observed",
+    },
+    {"model": "1KEY", "handler": "Widget::Set_Keyboard_1add0()", "keys": 1, "extras": 0, "public": False, "note": "internal handler symbol"},
+    {"model": "2KEY", "handler": "Widget::Set_Keyboard_2add0()", "keys": 2, "extras": 0, "public": True, "note": "public model string observed"},
+    {"model": "3KEY", "handler": "Widget::Set_Keyboard_3add0()", "keys": 3, "extras": 0, "public": True, "note": "public model string observed"},
+    {"model": "3+1KEY", "handler": "Widget::Set_Keyboard_3add1()", "keys": 3, "extras": 1, "public": True, "note": "public model string observed"},
+    {"model": "4KEY", "handler": "Widget::Set_Keyboard_4Key()", "keys": 4, "extras": 0, "public": True, "note": "public model string observed"},
+    {"model": "4+1KEY", "handler": "Widget::Set_Keyboard_4add1()", "keys": 4, "extras": 1, "public": True, "note": "public model string observed"},
+    {"model": "4+1_2KEY", "handler": "Widget::Set_Keyboard_4add2()", "keys": 4, "extras": 2, "public": True, "note": "public string naming is vendor-specific"},
+    {"model": "4+3KEY", "handler": "Widget::Set_Keyboard_4add3()", "keys": 4, "extras": 3, "public": False, "note": "internal handler symbol; no matching public model string observed"},
+    {"model": "5KEY", "handler": "Widget::Set_Keyboard_5Key_Mute()", "keys": 5, "extras": 0, "public": True, "note": "mute-specific handler/image strings observed"},
+    {"model": "6KEY", "handler": "Widget::Set_Keyboard_6Key()", "keys": 6, "extras": 0, "public": True, "note": "public model string observed"},
+    {"model": "6+1KEY", "handler": "Widget::Set_Keyboard_6add1()", "keys": 6, "extras": 1, "public": True, "note": "public model string observed"},
+    {"model": "6+2KEY", "handler": "Widget::Set_Keyboard_6add2()", "keys": 6, "extras": 2, "public": True, "note": "public model string observed"},
+    {"model": "6+2KEY-LAN-KD", "handler": "Widget::Set_Keyboard_6add2_Lan_KD()", "keys": 6, "extras": 2, "public": False, "note": "LAN/KD special handler and QR image strings observed"},
+    {"model": "9KEY", "handler": "Widget::Set_Keyboard_9add0()", "keys": 9, "extras": 0, "public": False, "note": "internal handler symbol"},
+    {"model": "9+2KEY", "handler": "Widget::Set_Keyboard_9add2()", "keys": 9, "extras": 2, "public": True, "note": "public model string observed"},
+    {"model": "9+3KEY", "handler": "Widget::Set_Keyboard_9add3()", "keys": 9, "extras": 3, "public": True, "note": "public model string observed"},
+    {"model": "11+3KEY", "handler": "Widget::Set_Keyboard_11add3()", "keys": 11, "extras": 3, "public": True, "note": "public model string observed"},
+    {"model": "12KEY", "handler": "Widget::Set_Keyboard_12add0()", "keys": 12, "extras": 0, "public": False, "note": "internal handler symbol"},
+    {"model": "12+2KEY", "handler": "Widget::Set_Keyboard_12add2()", "keys": 12, "extras": 2, "public": True, "note": "connected board handler; physically tested"},
+    {"model": "12+3KEY", "handler": "Widget::Set_Keyboard_12add3()", "keys": 12, "extras": 3, "public": True, "note": "public model string observed"},
+    {"model": "12+4KEY", "handler": "Widget::Set_Keyboard_12add4()", "keys": 12, "extras": 4, "public": False, "note": "internal handler symbol; no matching public model string observed"},
+    {"model": "12+4KEY-LAN", "handler": "Widget::Set_Keyboard_12add4_Lan()", "keys": 12, "extras": 4, "public": False, "note": "LAN special handler observed"},
+    {"model": "15+3KEY", "handler": "Widget::Set_Keyboard_15add3()", "keys": 15, "extras": 3, "public": True, "note": "public model string observed"},
+    {"model": "16KEY", "handler": "Widget::Set_Keyboard_16add0()", "keys": 16, "extras": 0, "public": False, "note": "internal handler symbol"},
+    {"model": "16+3KEY", "handler": "Widget::Set_Keyboard_16add3()", "keys": 16, "extras": 3, "public": False, "note": "internal handler symbol"},
+    {"model": "21+1KEY", "handler": "Widget::Set_Keyboard_21add1()", "keys": 21, "extras": 1, "public": False, "note": "internal handler symbol"},
+)
+
+
+def vendor_model_handlers() -> list[dict[str, object]]:
+    return [dict(row) for row in VENDOR_MODEL_HANDLERS]
+
+
+PROCREATE_PRESETS: tuple[tuple[str, str, tuple[int, ...]], ...] = (
+    ("quick-menu", "QuickMenu", (0x2C,)),
+    ("debug-commands", "Debug Commands", (0x35,)),
+    ("brush-tool", "Activate Brush Tool", (0x05,)),
+    ("color-panel", "Open Color Panel", (0x06,)),
+    ("eraser-tool", "Activate Eraser Tool", (0x3E,)),
+    ("layers-panel", "Open Layers Panel", (0x0F,)),
+    ("selection-mode", "Enter Selection Mode", (0x16,)),
+    ("transform-mode", "Enter Transform Mode", (0x19,)),
+    ("swap-previous-current-color", "Switch Between Previous and Current Color", (0x1B,)),
+    ("color-pick-alt", "Color Pick (Alt)", (0xF3,)),
+    ("color-pick-m-ios17", "Color Pick M (iOS 17)", (0x10,)),
+    ("clear-selected-layer", "Clear Selected Layer", (0xF4, 0x2A)),
+    ("toggle-full-screen-mode", "Toggle Full Screen Mode", (0xF4, 0x27)),
+    ("toggle-perspective-guide", "Toggle Perspective Guide", (0xF4, 0x33)),
+    ("decrease-brush-size-1", "Decrease Brush Size by 1%", (0xF4, 0x2F)),
+    ("increase-brush-size-1", "Increase Brush Size by 1%", (0xF4, 0x30)),
+    ("decrease-brush-size-5", "Decrease Brush Size by 5%", (0x2F,)),
+    ("increase-brush-size-5", "Increase Brush Size by 5%", (0x30,)),
+    ("decrease-brush-size-10", "Decrease Brush Size by 10%", (0xF2, 0x2F)),
+    ("increase-brush-size-10", "Increase Brush Size by 10%", (0xF2, 0x30)),
+    ("copy-all", "Copy All", (0xF4, 0x04)),
+    ("apply-color-balance", "Apply Color Balance Adjustment", (0xF4, 0x05)),
+    ("copy", "Copy", (0xF4, 0x06)),
+    ("clear-selection", "Clear Selection", (0xF4, 0x07)),
+    ("duplicate-selection", "Duplicate Selection", (0xF4, 0x0D)),
+    ("actions-menu", "Open Actions Menu", (0xF4, 0x0E)),
+    ("apply-hsb-adjustment", "Apply HSB Adjustment", (0xF4, 0x18)),
+    ("paste", "Paste", (0xF4, 0x19)),
+    ("cut", "Cut", (0xF4, 0x1B)),
+    ("undo", "Undo", (0xF4, 0x1D)),
+    ("redo", "Redo", (0xF2, 0xF4, 0x1D)),
+)
+
+PROCREATE_ACTIONS: tuple[tuple[str, str], ...] = tuple(
+    (slug, label) for slug, label, _ in PROCREATE_PRESETS
+)
+PROCREATE_PRESET_BY_SLUG: dict[str, tuple[str, tuple[int, ...]]] = {
+    slug: (label, tokens) for slug, label, tokens in PROCREATE_PRESETS
+}
+
+VENDOR_MEDIA_LABELS: tuple[str, ...] = (
+    "Play/Pause",
+    "Stop",
+    "Previous track",
+    "Next track",
+    "My Computer",
+    "Screen brightness+",
+    "Screen brightness-",
+    "Multimedia",
+    "Mute",
+    "Volume+",
+    "Volume-",
+    "Calculator",
+    "WWW home",
+    "E-mail",
+    "Bass+",
+    "Bass-",
+    "Treble+",
+    "Treble-",
+    "WWW Pagerefresh",
+    "WWW Pageforward",
+    "WWW Pageback",
+)
+
+VENDOR_MOUSE_LABELS: tuple[str, ...] = (
+    "Mouse LeftKey",
+    "Mouse Middle",
+    "Mouse Right",
+    "Mouse Wheel+",
+    "Mouse Wheel-",
+    "Ctrl+Mouse Up",
+    "Ctrl+Mouse Down",
+    "Shift+Mouse Up",
+    "Shift+Mouse Down",
+    "Alt+Mouse Up",
+    "Alt+Mouse Down",
+    "Like",
+    "Swipe left",
+    "Swipe right",
+    "Swipe Up",
+    "Swipe Down",
+)

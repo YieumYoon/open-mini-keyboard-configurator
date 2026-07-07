@@ -1,0 +1,27 @@
+[project]
+name = "open-mini-keyboard-configurator"
+version = "0.1.0"
+description = "Unofficial experimental MINI_KEYBOARD.app HID configurator"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {file = "LICENSE"}
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Topic :: System :: Hardware :: Hardware Drivers",
+]
+dependencies = []
+
+[project.scripts]
+mini-keyboard-tool = "mini_keyboard_tool.cli:main"
+open-mini-keyboard-configurator = "mini_keyboard_tool.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

@@ -1,0 +1,43 @@
+# Local environments
+.venv/
+venv/
+env/
+
+# Python caches and build output
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+*.egg-info/
+
+# Local HID captures and device-specific state
+snapshots/
+*.hidlog
+
+# Vendor binaries / installer artifacts should not be published here.
+*.pkg
+*.app/
+*.dmg
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.dylib
+*.so
+*.dll
+*.exe
+*.bin
+*.hex
+
+# OS/editor noise
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.swo
