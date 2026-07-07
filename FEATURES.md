@@ -55,8 +55,8 @@ For physical behavior observed on the connected board, see `PHYSICAL_TESTS.md`.
   static token catalog extracted from the binary.
 - Regression tests for critical HID report byte layouts.
 - Current-device verification for the tested baseline profile.
-- Tk GUI report generation for basic, media, mouse, macro, Procreate, LED,
-  bulk clear, and read-back flows.
+- Rough Tk GUI prototype for basic, media, mouse, macro, Procreate, LED, bulk
+  clear, and read-back flows. The CLI is the primary supported interface.
 - Focused experiment presets for macro delay, raw media, modified wheel, swipe,
   and LED mode tests.
 - Generated `test-plan` command sequences for the remaining physical test
@@ -82,8 +82,8 @@ For physical behavior observed on the connected board, see `PHYSICAL_TESTS.md`.
 - Whether LED entries `13` through `16` are used on another hardware variant.
 - LED behavior over the wireless dongle. Wired USB shows `mode2`; the observed
   dongle setup did not light the LEDs, and the cause is not yet known.
-- GUI writes for the expanded tabs beyond basic key remaps, including bulk
-  clear.
+- GUI write flows beyond basic smoke coverage. The Tk GUI is intentionally
+  secondary to the CLI and should be treated as experimental.
 - Procreate preset writes through `procreate --action ...`; the token mappings
   are static-vendor extractions and still need app-level physical testing.
 
@@ -95,8 +95,9 @@ For physical behavior observed on the connected board, see `PHYSICAL_TESTS.md`.
   and does not call the HID write path. Per-layer assignment/output is
   confirmed; standalone layer switching from the replacement tool is separate
   and still unidentified.
-- Exact vendor-app visual parity. The replacement GUI now covers the main
-  protocol flows, but it is intentionally simpler than the Qt vendor UI.
+- Exact vendor-app visual parity. The rough Tk prototype exists for convenience
+  and debugging, but visual parity with the Qt vendor UI is intentionally out
+  of scope.
 
 ## Useful Test Queue
 

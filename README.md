@@ -1,6 +1,7 @@
 # Open MINI Keyboard Configurator
 
-Experimental, unofficial open configurator for the vendor `MINI_KEYBOARD.app`.
+Experimental, unofficial CLI-first configurator for the vendor
+`MINI_KEYBOARD.app`.
 
 ## Status and disclaimer
 
@@ -99,13 +100,16 @@ From this directory:
 ```sh
 uv run python -m mini_keyboard_tool --help
 uv run python -m mini_keyboard_tool remap --key 0 --to a
+```
+
+This project is CLI-first. There is a rough experimental Tk GUI prototype:
+
+```sh
 uv run python -m mini_keyboard_tool gui
 ```
 
-The Tk GUI has tabs for basic keys, media keys, mouse/wheel/swipe actions,
-macros, Procreate presets, LED colors, bulk clear reports, and read-back
-operations. It also stays in dry-run mode until you explicitly uncheck it and
-confirm a write.
+Treat the GUI as a convenience/debugging surface, not as a polished vendor-app
+replacement. The physically verified and best-documented path is the CLI.
 
 Write a key only after checking the dry-run report:
 
@@ -358,8 +362,8 @@ Physically tested on the 12-key + 2-knob board:
   static token catalog extracted from the app binary.
 - Unit tests for the critical HID report layouts.
 - Current-device verification for the tested baseline profile.
-- Tk GUI report generation for basic, media, mouse, macro, Procreate, LED,
-  bulk clear, and read-back flows.
+- Rough Tk GUI prototype for basic, media, mouse, macro, Procreate, LED, bulk
+  clear, and read-back flows. The CLI is the primary supported interface.
 - Focused experiment presets for the remaining physical test queue.
 - Generated physical test plans for the remaining feature queue.
 
@@ -369,8 +373,8 @@ testing on this board:
 - Full read-only configuration and LED snapshots for before/after comparison.
 - Snapshot writes back to the device via `restore-snapshot --write --yes`, with
   semantic diff support for post-restore behavior checks.
-- GUI writes for media, mouse, macro, Procreate, LED, and bulk clear flows
-  beyond basic key remaps.
+- GUI write flows beyond basic smoke coverage. The Tk GUI is intentionally
+  secondary to the CLI and should be treated as experimental.
 - Macro delay behavior beyond the tested layer-0 basic-mode token-list path.
 - Consumer HID values beyond the tested media keys and raw `0x0192` usage.
 - Keyboard-backlight brightness usages write/read back, but visible behavior is

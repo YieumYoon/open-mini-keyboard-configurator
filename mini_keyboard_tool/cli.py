@@ -2398,7 +2398,7 @@ def cmd_gui(args: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="mini-keyboard-tool",
-        description="Experimental CLI/GUI configurator for the MINI_KEYBOARD HID protocol.",
+        description="Experimental CLI-first configurator for the MINI_KEYBOARD HID protocol.",
     )
     parser.add_argument("--version", action="version", version=__version__)
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -2992,7 +2992,7 @@ def build_parser() -> argparse.ArgumentParser:
     extra_pattern_parser.add_argument("--yes", action="store_true", help="Confirm device write")
     extra_pattern_parser.set_defaults(func=cmd_extra_pattern)
 
-    gui_parser = subparsers.add_parser("gui", help="Open a small Tkinter GUI")
+    gui_parser = subparsers.add_parser("gui", help="Open a rough experimental Tkinter GUI")
     add_hid_args(gui_parser)
     gui_parser.set_defaults(func=cmd_gui)
 

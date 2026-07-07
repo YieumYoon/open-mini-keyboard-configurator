@@ -39,7 +39,7 @@ covered by dry-runs/tests, but still needs focused physical testing.
 | Model picker / related boards | model strings `2KEY` through `15+3KEY`, `Widget::Set_Keyboard_*` handlers | `vendor-models`, `vendor-models --handlers` | not shown | Static catalog. Current layout helpers target the tested `12+2KEY` board; handler list also shows internal layouts without public model strings. |
 | Snapshot / restore safety | replacement-only safety workflow | `snapshot`, `diff-snapshot`, `restore-snapshot`, `profiles`, `profile`, `test-plan` | Read tab plus CLI | Replacement addition, not a vendor UI feature. Used for safe experiments and recovery. |
 | Software update | `KB_UpData_SoftWare` strings | none | none | Not implemented intentionally; outside open HID remapping scope. |
-| Exact Qt visual parity | Qt 5 UI resources/styles | none | simplified Tk GUI | Not implemented intentionally. The replacement focuses on transparent, dry-run-first HID control. |
+| Exact Qt visual parity | Qt 5 UI resources/styles | none | rough Tk prototype | Not implemented intentionally. The replacement focuses on transparent, dry-run-first CLI HID control. |
 
 ## Current Completion Boundary
 
